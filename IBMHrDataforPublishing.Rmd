@@ -1,0 +1,420 @@
+---
+title: "IBM HR Data Analysis"
+author: "Bhanuprakash"
+date: "21 April 2017"
+output: html_document
+---
+# Introduction
+
+Objective: To predict if an employee is going to resign or not
+
+Dataset : We are using a dataset put up by IBM for our analysis. The dataset contain 35 variables along with Attrition variable. It can be downloaded from the following link
+
+Link- https://www.ibm.com/communities/analytics/watson-analytics-blog/hr-employee-attrition/
+
+Methodology: 
+1. Through our analysis we intend to build a model which can predict if an employee is about to quit. 
+2. We shall be looking at all variables through some plots and infer about it in our exploratory analysis. 
+3. After our exploration we shall build some features based on the Variables at hand and take a call on inclusion/exclusion of few variables.
+
+# Loading the data
+
+We load the data and look at the different Variables in the dataset
+
+```{r}
+setwd("C:/Users/user/Desktop/Bhanu/Data Science/Self Projects/IBM HR Data Analysis")
+
+HRdata <- read.csv("IBMhrData.csv")
+names(HRdata)
+colnames(HRdata)[1] <- "Age" # Renaming the column
+```
+
+# Splitting the Dataset into Training & Testing 
+In ordet to build our model we have to train on a set of observations, which we call the Training Set and then validate on the remaining set of observations, which we call our Testing Set.
+
+So, we will perform all our analysis on the training set and validate it on our testing set. We shall divide our dataset into training(75%) and testing(25%)
+
+```{r}
+library(caret)
+set.seed(12345)
+inTrain <- createDataPartition(HRdata$Attrition,p=0.75,list = FALSE)
+Training <- HRdata[inTrain,]
+Testing <- HRdata[-inTrain,]
+```
+# Exploratory Analysis
+
+Lets have a look at the format of the fields which we have to play with in the Training Set
+
+```{r}
+str(Training)
+```
+
+Let us start by taking a look at the attrition percentage of IBM. We see that we have approximately 16% leaving the organization.
+
+```{r}
+library(ggplot2)
+ggplot(Training,aes(Attrition,fill=Attrition))+geom_bar()
+
+prop.table(table(Training$Attrition)) #Percentage of Attrition
+
+```
+
+Let us look at each variable and see its influence on the Attrition of the organization 
+
+1. Age: We see that majority of employees leaving the org are around 30 Years (Fig 1).
+2. Business Travel: Among people who leave, most travel(Fig 1).
+3. Daily Rate: We are not able to see any distinguishable feature here(Fig 1).
+4. Department: Among people attrited employees from HR dept. are less.It is because of low proportion of HR in the organization(Fig 1).
+
+```{r}
+library(ggplot2)
+library(grid)
+library(gridExtra)
+agePlot <- ggplot(Training,aes(Age,fill=Attrition))+geom_density()+facet_grid(~Attrition)
+travelPlot <- ggplot(Training,aes(BusinessTravel,fill=Attrition))+geom_bar()
+ratePlot <- ggplot(Training,aes(DailyRate,Attrition))+geom_point(size=4,alpha = 0.05)
+depPlot <- ggplot(Training,aes(Department,fill = Attrition))+geom_bar()
+grid.arrange(agePlot,travelPlot,ratePlot,depPlot,ncol=2,top = "Fig 1")
+```
+
+5. Distance From Home: Contrary to normal assumptions, a mojority of       employees who have left the organization are near to the Office (Fig 2).
+6. Education: From the metadata we know that  1 'Below College' 2 'College'    3 'Bachelor' 4 'Master' 5 'Doctor' . Looking at the plot we see that very    few Doctors attrite. May be because of less number(Fig 2).
+7. Education Field: On lines of the trend in Departments, a minority of HR     educated employees leave and it is majorly because of low number of people(Fig 2).
+8. Employee Count : It is an insignificant variable for us.
+9. Employee Number: It is also an insignificant variable for us.
+10. Environment Satisfaction: Ratings stand for - 1 'Low' 2 'Medium' 3 'High'    4 'Very High' . We don't see any distinguishable feature(Fig 2).
+
+```{r}
+distPlot <- ggplot(Training,aes(DistanceFromHome,fill=Attrition))+geom_bar()
+eduPlot <- ggplot(Training,aes(Education,fill=Attrition))+geom_bar()
+edufieldPlot <- ggplot(Training,aes(EducationField,fill=Attrition))+geom_bar()
+envPlot <- ggplot(Training,aes(EnvironmentSatisfaction,fill=Attrition))+geom_bar()
+genPlot <- ggplot(Training,aes(Gender,fill=Attrition))+geom_bar()
+grid.arrange(distPlot,eduPlot,edufieldPlot,envPlot,genPlot,ncol=2,top = "Fig 2")
+```
+
+11. Gender: We see that majority of separated employees are Male and the reason might be because around 61% of employees in our dataset are Male.
+12. HourlyRate : We don't get much inference from this. There also seems to     be no straightforward relation with the Daily Rate of the employees.
+13. Job Involvement:  Ratings stand for 1 'Low' 2 'Medium' 3 'High' 4 'Very     High'. We see that majority of employees who leave are either Very Highly    involved or Low Involved in their Jobs. 
+14. JobLevel:We have no metadata with regard to the numbers in Job Level. But by looking at proportion of people seems like 1 stands for entry level and 5 stands for highest level in our Dataset. By looking at plot we see that as the Job Level increases the number of people quitting decreases.
+15. Job Satisfaction: As per metadata 1 'Low' 2 'Medium' 3 'High' 4 'Very High'. We see higher attrition levels in among lower Job Satisfaction levels.
+
+```{r}
+hourlyPlot <- ggplot(Training,aes(HourlyRate,fill=Attrition))+geom_bar()
+jobInvPlot <- ggplot(Training,aes(JobInvolvement,fill=Attrition))+geom_bar()
+jobLevelPlot <- ggplot(Training,aes(JobLevel,fill=Attrition))+geom_bar()
+jobSatPlot <- ggplot(Training,aes(JobSatisfaction,fill=Attrition))+geom_bar()
+grid.arrange(hourlyPlot,jobInvPlot,jobLevelPlot,jobSatPlot,ncol=2,top = "Fig 3")
+```
+
+16. Marital Status:Attrition is on higher side for Single and lowest for Divorced employees.
+17. Monthly Income: We see higher levels of attrition among the lower segment of monthly income. If looked at in isolation, might be due to dissatisfaction of income for the effort out.
+18. Monthly Rate: We don't see any inferable trend from this. Also no straightforwad relation with Monthly Income.
+19. Number of Companies Worked: We see a clear indication that many people who have worked only in One company before quit a lot.
+
+```{r}
+
+marPlot <- ggplot(Training,aes(MaritalStatus,fill=Attrition))+geom_bar()
+monthlyIncPlot <- ggplot(Training,aes(MonthlyIncome,fill=Attrition))+geom_density()
+monthlyRatePlot <- ggplot(Training,aes(MonthlyRate,fill=Attrition))+geom_density()
+numCompPlot <- ggplot(Training,aes(NumCompaniesWorked,fill=Attrition))+geom_bar()
+grid.arrange(marPlot,monthlyIncPlot,monthlyRatePlot,numCompPlot,ncol=2,top = "Fig 4")
+```
+
+20. Over18: Seems like an insignificant variable as all are above 18 Years.
+21. Over Time: Larger Proportion of Overtime Employees are quitting.
+22. Percent Salary Hike: We see that people with less than 15% hike have more chances to leave.
+23. Performance Rating: 1 'Low' 2 'Good' 3 'Excellent' 4 'Outstanding'. We see that we have employees of only 3 and 4 ratings. Lesser proportion of 4 raters quit.
+24. Relationship Satisfaction: 1 'Low' 2 'Medium' 3 'High' 4 'Very High'. Higher number of people with 3 or more rating are quitiing. But Larger proportions of 1 & 2 rating are quitting.
+
+```{r}
+overTimePlot <- ggplot(Training,aes(OverTime,fill=Attrition))+geom_bar()
+hikePlot <- ggplot(Training,aes(PercentSalaryHike,Attrition))+geom_point(size=4,alpha = 0.01)
+perfPlot <- ggplot(Training,aes(PerformanceRating,fill = Attrition))+geom_bar()
+RelSatPlot <- ggplot(Training,aes(RelationshipSatisfaction,fill = Attrition))+geom_bar()
+grid.arrange(overTimePlot,hikePlot,perfPlot,RelSatPlot,ncol=2,top = "Fig 5")
+```
+
+25. Standard Hours: Same for all and hence not a significant variable for us.
+26. Stock Option Level: Larger proportions of levels 1 & 2 quit.
+27. Total Working Years: We see larger proportions of people with 1 year of experiences quitting the organization also in bracket of 1-10 Years.
+28. Traning Times Last Year: This indicates the no of training interventions the employee has attended. People who have been trained 2-4 times is an area of concern.
+
+```{r}
+StockPlot <- ggplot(Training,aes(StockOptionLevel,fill = Attrition))+geom_bar()
+workingYearsPlot <- ggplot(Training,aes(TotalWorkingYears,fill = Attrition))+geom_bar()
+TrainTimesPlot <- ggplot(Training,aes(TrainingTimesLastYear,fill = Attrition))+geom_bar()
+WLBPlot <- ggplot(Training,aes(WorkLifeBalance,fill = Attrition))+geom_bar()
+grid.arrange(StockPlot,workingYearsPlot,TrainTimesPlot,WLBPlot,ncol=2,top = "Fig 6")
+```
+
+29. Work Life Balance:Ratings as per Metadata is 1 'Bad' 2 'Good' 3 'Better' 4 'Best'. As expected larger proportion of 1 rating quit, but absolute number wise 2 & 3 are on higher side.
+30. Years at Company: Larger proportion of new comers are quitting the organization. Which sidelines the recruitment efforts of the organization.
+31. Years In Current Role: Plot shows a larger proportion with just 0 years quitting. May be a role change is a trigger for Quitting.
+32. Years Since Last Promotion: Larger proportion of people who have been promoted recently have quit the organization.
+33. Years With Current Manager: As expected a new Manager is a big cause for quitting.
+
+```{r}
+YearAtComPlot <- ggplot(Training,aes(YearsAtCompany,fill = Attrition))+geom_bar()
+YearInCurrPlot <- ggplot(Training,aes(YearsInCurrentRole,fill = Attrition))+geom_bar()
+YearsSinceProm <- ggplot(Training,aes(YearsSinceLastPromotion,fill = Attrition))+geom_bar()
+YearsCurrManPlot <- ggplot(Training,aes(YearsWithCurrManager,fill = Attrition))+geom_bar()
+grid.arrange(YearAtComPlot,YearInCurrPlot,YearsSinceProm,YearsCurrManPlot,ncol=2,top = "Fig 7")
+```
+
+# Sampling
+
+If we look at the dataset the minority is Attrition - Yes cases ( 16%).
+
+Usually if we the proportion of Minority class is too low, we can try to balance the sample using Oversampling or Undersampling techniques. They come with their advantages and disadvantages though, which should be kept in mind while doing so.
+
+In this analysis,we don't get any better results using the above mentioned techniques. Also the proportion and absolute number is not too less. Hence, we stick with the sample we have for model building.
+
+```{r}
+Training1_os <- Training
+```
+
+# Feature Engineering
+
+Feature engineering is one aspect which provided a huge impact on the outcome rather than the model. Here, we try at creating new features with the existing variables we have based on my assumptions.
+
+1. Tenure per job: Usually, people who have worked with many companies but for small periods at every organization tend to leave early as they always need a change of Organization to keep them going.
+
+2. Years without Change: For any person, a change either in role or job level or responsibility is needed to keep the work exciting to continue. We create a variable to see how many years it has been for an employee without any sort of change using Promotion, Role and Job Change as a metric to cover different variants of change.
+
+If we look at the plots in Fig 8, we see that there is an influence of these new features on the Attrition.
+
+3. Compa Ratio: Compa Ratio is the ratio of the actual pay of an Employee to the midpoint of a salary range. The salary range can be that of his/her department or organization or role. The benchmark numbers can be a organization's pay or Industry average.
+
+Here, we use the Comapny pay information to calculate our Compa Ratio at Department Level & Organiation Level.
+
+People, with Compa Ratio less than 1, usually feel underpaid and show more tendency to leave the Organization in search of a better pay.
+
+If we look at the figure (Fig 9), we can notice the effect of lower Compa Ratios.
+```{r}
+Training1_os$TenurePerJob <- ifelse(Training1_os$NumCompaniesWorked!=0, Training1_os$TotalWorkingYears/Training1_os$NumCompaniesWorked,0)
+Training1_os$YearWithoutChange <- Training1_os$YearsInCurrentRole - Training1_os$YearsSinceLastPromotion
+Training1_os$YearsWithoutChange2 <- Training1_os$TotalWorkingYears - Training1_os$YearsSinceLastPromotion
+
+tenurePlot <- ggplot(Training1_os,aes(TenurePerJob))+geom_density()+facet_grid(~Attrition)
+changePlot <- ggplot(Training1_os,aes(YearWithoutChange))+geom_density()+facet_grid(~Attrition)
+change2Plot <- ggplot(Training1_os,aes(YearsWithoutChange2))+geom_density()+facet_grid(~Attrition)
+grid.arrange(tenurePlot,changePlot,change2Plot,ncol=2,top = "Fig 8")
+
+Med_HR <- median(Training1_os[Training1_os$Department == 'Human Resources',]$MonthlyIncome)
+Med_RnD <- median(Training1_os[Training1_os$Department == 'Research & Development',]$MonthlyIncome)
+Med_Sales <- median(Training1_os[Training1_os$Department == 'Sales',]$MonthlyIncome)
+
+
+Med_LabTech <- median(Training1_os[Training1_os$JobRole == 'Laboratory Technician',]$MonthlyIncome)
+
+TrainLabTech <- Training1_os[Training1_os$JobRole == 'Laboratory Technician',]
+TrainLabTech$comparole <- TrainLabTech$MonthlyIncome/Med_LabTech
+
+Med_overall <- median(Training1_os$MonthlyIncome)
+
+Training1_os$CompaRatioDep <- ifelse(Training1_os$Department == 'Human Resources',Training1_os$MonthlyIncome/Med_HR,ifelse(Training1_os$Department=='Research & Development',Training1_os$MonthlyIncome/Med_RnD,Training1_os$MonthlyIncome/Med_Sales))
+
+Training1_os$CompaRatioOverall <- Training1_os$MonthlyIncome/Med_overall
+
+Training1_os$CompaOverallGroup <- ifelse(Training1_os$CompaRatioOverall>4,4,ifelse(Training1_os$CompaRatioOverall>3,3,ifelse(Training1_os$CompaRatioOverall>2,2,ifelse(Training1_os$CompaRatioOverall>1,1,ifelse(Training1_os$CompaRatioOverall>0.5,0.5,0)))))
+
+Training1_os$CompaDepGroup <- ifelse(Training1_os$CompaRatioDep>4,4,ifelse(Training1_os$CompaRatioDep>3,3,ifelse(Training1_os$CompaRatioDep>2,2,ifelse(Training1_os$CompaRatioDep>1,1,ifelse(Training1_os$CompaRatioDep>0.5,0.5,0)))))
+
+
+CompaOverallPlot <- ggplot(Training1_os,aes(CompaRatioOverall))+geom_density()+facet_grid(~Attrition)
+CompaDepPlot <- ggplot(Training1_os,aes(CompaRatioDep))+geom_density()+facet_grid(~Attrition)
+grid.arrange(CompaOverallPlot,CompaDepPlot,ncol=2,top = "Fig 9")
+
+
+# Adding the variables for Testing Set
+
+Testing$TenurePerJob <- ifelse(Testing$NumCompaniesWorked!=0, Testing$TotalWorkingYears/Testing$NumCompaniesWorked,0)
+Testing$YearWithoutChange <- Testing$YearsInCurrentRole - Testing$YearsSinceLastPromotion
+Testing$YearsWithoutChange2 <- Testing$TotalWorkingYears - Testing$YearsSinceLastPromotion
+
+
+Testing$CompaRatioDep <- ifelse(Testing$Department == 'Human Resources',Testing$MonthlyIncome/Med_HR,ifelse(Testing$Department=='Research & Development',Testing$MonthlyIncome/Med_RnD,Testing$MonthlyIncome/Med_Sales))
+
+Testing$CompaRatioOverall <- Testing$MonthlyIncome/Med_overall
+
+Testing$CompaOverallGroup <- ifelse(Testing$CompaRatioOverall>4,4,ifelse(Testing$CompaRatioOverall>3,3,ifelse(Testing$CompaRatioOverall>2,2,ifelse(Testing$CompaRatioOverall>1,1,ifelse(Testing$CompaRatioOverall>0.5,0.5,0)))))
+
+Testing$CompaDepGroup <- ifelse(Testing$CompaRatioDep>4,4,ifelse(Testing$CompaRatioDep>3,3,ifelse(Testing$CompaRatioDep>2,2,ifelse(Testing$CompaRatioDep>1,1,ifelse(Testing$CompaRatioDep>0.5,0.5,0)))))
+
+#Testing$AvgSatis <- with(Testing,(EnvironmentSatisfaction+JobInvolvement+JobSatisfaction+RelationshipSatisfaction+WorkLifeBalance)/4)
+
+```
+
+## Binning of Variables
+
+Many of our variables are either continuos in nature or have lot of discrete values which peak at certain points.
+
+To make sense of it we need to Categorise our variables which can collect the impact making groups and make more sense. Hence, we categorize many of the features.
+
+While doing these transformations, we ensure that we do the same to our Testing set also.
+```{r}
+Training1_os$AgeGroup <- with(Training1_os,ifelse(Age>55,8,ifelse(Age>50,7,ifelse(Age>45,6,ifelse(Age>40,5,ifelse(Age>35,4,ifelse(Age>30,3,ifelse(Age>25,2,1)))))))) #Creating Age Groups
+
+Training1_os$DistanceGroup <- with(Training1_os,ifelse(DistanceFromHome>25,6,ifelse(DistanceFromHome>20,5,ifelse(DistanceFromHome>15,4,ifelse(DistanceFromHome>10,3,ifelse(DistanceFromHome>5,2,1)))))) #Creating Distance Groups
+
+Training1_os$YearsWithManagerGroup <- with(Training1_os,ifelse(YearsWithCurrManager>15,5,ifelse(YearsWithCurrManager>10,4,ifelse(YearsWithCurrManager>5,3,ifelse(YearsWithCurrManager>2,2,1))))) #Creating YearsWithManager Groups
+
+
+Training1_os$TenureGroup <- with(Training1_os,ifelse(TenurePerJob>35,9,ifelse(TenurePerJob>30,8,ifelse(TenurePerJob>25,7,ifelse(TenurePerJob>20,6,ifelse(TenurePerJob>15,5,ifelse(TenurePerJob>10,4,ifelse(TenurePerJob>5,3,ifelse(TenurePerJob>2,2,1))))))))) #Creating Tenure Per Job groups
+
+Training1_os$Change2Group <- with(Training1_os,ifelse(YearsWithoutChange2>10,3,ifelse(YearsWithoutChange2>5,2,1))) #Creating Years Without Change2
+
+Training1_os$Change1Group <- with(Training1_os,ifelse(YearWithoutChange>2.5,3,ifelse(YearWithoutChange>-2.5,2,1))) #Creating Years Without Change 1
+
+#Training1_os$AvgSatisGroup <- with(Training1_os,ifelse(AvgSatis<2.5,1,2)) # Create Average Satisfaction Groups
+
+Training1_os$WorkYearGroup <- with(Training1_os,ifelse(TotalWorkingYears>35,9,ifelse(TotalWorkingYears>30,8,ifelse(TotalWorkingYears>25,7,ifelse(TotalWorkingYears>20,6,ifelse(TotalWorkingYears>15,5,ifelse(TotalWorkingYears>10,4,ifelse(TotalWorkingYears>5,3,ifelse(TotalWorkingYears>2,2,1)))))))))
+
+Training1_os$NumCompGroup <- with(Training1_os,ifelse(NumCompaniesWorked>4,3,ifelse(NumCompaniesWorked>2,2,1))) #Creating Number of Companies Worked
+
+# For Testing Set
+
+Testing$AgeGroup <- with(Testing,ifelse(Age>55,8,ifelse(Age>50,7,ifelse(Age>45,6,ifelse(Age>40,5,ifelse(Age>35,4,ifelse(Age>30,3,ifelse(Age>25,2,1)))))))) #Creating Age Groups
+
+Testing$DistanceGroup <- with(Testing,ifelse(DistanceFromHome>25,6,ifelse(DistanceFromHome>20,5,ifelse(DistanceFromHome>15,4,ifelse(DistanceFromHome>10,3,ifelse(DistanceFromHome>5,2,1)))))) #Creating Distance Groups
+
+Testing$YearsWithManagerGroup <- with(Testing,ifelse(YearsWithCurrManager>15,5,ifelse(YearsWithCurrManager>10,4,ifelse(YearsWithCurrManager>5,3,ifelse(YearsWithCurrManager>2,2,1))))) #Creating YearsWithManager Groups
+
+
+Testing$TenureGroup <- with(Testing,ifelse(TenurePerJob>35,9,ifelse(TenurePerJob>30,8,ifelse(TenurePerJob>25,7,ifelse(TenurePerJob>20,6,ifelse(TenurePerJob>15,5,ifelse(TenurePerJob>10,4,ifelse(TenurePerJob>5,3,ifelse(TenurePerJob>2,2,1))))))))) #Creating Tenure Per Job groups
+
+Testing$Change2Group <- with(Testing,ifelse(YearsWithoutChange2>10,3,ifelse(YearsWithoutChange2>5,2,1))) #Creating Years Without Change2
+
+Testing$Change1Group <- with(Testing,ifelse(YearWithoutChange>2.5,3,ifelse(YearWithoutChange>-2.5,2,1))) #Creating Years Without Change 1
+
+#Testing$AvgSatisGroup <- with(Testing,ifelse(AvgSatis<2.5,1,2)) # Creating avg satisfaction group
+
+Testing$WorkYearGroup <- with(Testing,ifelse(TotalWorkingYears>35,9,ifelse(TotalWorkingYears>30,8,ifelse(TotalWorkingYears>25,7,ifelse(TotalWorkingYears>20,6,ifelse(TotalWorkingYears>15,5,ifelse(TotalWorkingYears>10,4,ifelse(TotalWorkingYears>5,3,ifelse(TotalWorkingYears>2,2,1)))))))))
+
+Testing$NumCompGroup <- with(Testing,ifelse(NumCompaniesWorked>4,3,ifelse(NumCompaniesWorked>2,2,1))) #Creating Number of Companies Worked
+```
+
+## Correlation of Variables
+We see lot of correlation among the following variables
+
+1) Years at Company, Years in Curr Role, Years with Curr Manager & Years Since Last Promotion - We will consider 'Years with Curr Manager'
+2) Job Level & Monthly Income - We will consider 'Job Level'
+3) Percent Salary Hike & Performance Ratiing - We shall consider 'Percent Salary Hike
+
+```{r}
+
+library(corrplot)
+library(psych)
+
+Training_cor <- Training
+
+for(i in 1:ncol(Training_cor)){
+        
+        Training_cor[,i]<- as.integer(Training_cor[,i])
+}
+
+corrplot(cor(Training_cor))
+#plot(cor.ci(Training_cor))
+
+# Removing higly correlated Variables, Variables for which binning has been done and near Zero Variance variables 
+Train <- Training1_os[,c(2,3,5,7,8,11,12,14,15,16,17,18,21,23,24,26,28,29,30,31,41:48)]
+
+Train <- Training1_os[,c(2,3,5,7,8,11,12,14,15,16,17,18,21,23,24,26,29,30,31,41:48)]
+
+
+Test <- Testing[,-2]
+# Coding the categorical Variables
+
+Train$BusinessTravel <- as.integer(Train$BusinessTravel)
+Train$Department <- as.integer(Train$Department)
+Train$Gender <- as.integer(Train$Gender)
+Train$MaritalStatus <- as.integer(Train$MaritalStatus)
+Train$OverTime <- as.integer(Train$OverTime)
+Train$JobRole <- as.integer(Train$JobRole)
+Train$EducationField <- as.integer(Train$EducationField)
+
+Test$BusinessTravel <- as.integer(Test$BusinessTravel)
+Test$Department <- as.integer(Test$Department)
+Test$Gender <- as.integer(Test$Gender)
+Test$MaritalStatus <- as.integer(Test$MaritalStatus)
+Test$OverTime <- as.integer(Test$OverTime)
+Test$JobRole <- as.integer(Test$JobRole)
+Test$EducationField <- as.integer(Test$EducationField)
+
+Train1 <- Train
+for(i in 1:ncol(Train1)){
+        Train1[,i] <- as.factor(Train1[,i])
+}
+        
+```        
+ 
+# Model Building and Validation
+
+As we are facing a classification problem, we try to use tree based methods and GLM. We aslo apply Clustering Based Algorithms like SVM and KNN. 
+
+```{r}        
+fit_rpart <- train(Attrition ~.,Train,method = 'rpart', trControl = trainControl(method = 'cv',number = 3)) # A simple Decision Tree
+
+set.seed(123)
+fit_rf <- train(Attrition ~.,Train,method = 'rf', trControl = trainControl(method = 'repeatedcv',number = 3)) # Random Forest
+
+xgbGrid <- expand.grid(nrounds = 300,
+                       max_depth = 1,
+                       eta = 0.3,
+                       gamma = 0.01,
+                       colsample_bytree = .7,
+                       min_child_weight = 1,
+                       subsample = 0.9)
+
+set.seed(12)
+fit_xgb <- train(Attrition ~.,Train,method = 'xgbTree',tuneGrid = xgbGrid,trControl = trainControl(method = 'repeatedcv',number = 3,classProbs = TRUE)) 
+
+fit_nn <- train(Attrition ~.,Train,method = 'pcaNNet',trControl = trainControl(method = 'repeatedcv',number = 3),tuneGrid = expand.grid(size = 25,decay = 0.01))
+
+fit_glm <- train(Attrition~.,Train,method = 'glm',trControl = trainControl(method = 'repeatedcv',number = 3))
+
+fit_svm <- train(Attrition~.,Train,method = 'svmRadial',trControl = trainControl(method = 'repeatedcv',number = 3))
+
+fit_knn <- train(Attrition~.,Train,method = 'knn',trControl = trainControl(method = 'repeatedcv',number = 3))
+
+fit_glmBoost <- train(Attrition~.,Train,method = 'glmboost',trControl = trainControl(method = 'repeatedcv',number = 3))
+
+Predictions_rpart <- predict(fit_rpart,Test)
+Predictions_rf <- predict(fit_rf, Test)
+Predictions_xgb <- predict(fit_xgb, Test)
+Predictions_nn <- predict(fit_nn, Test)
+Predictions_glm <- predict(fit_glm, Test)
+Predictions_svm <- predict(fit_svm,Test)
+Predictions_knn <- predict(fit_knn,Test)
+Predictions_glmboost <- predict(fit_glmBoost,Test)
+
+```
+
+# Basis of Selecting a Model
+
+In order to find the best model we look at the confusion matrix comparing with the Actual Values.
+
+Once we identify the best model, we try to tune it further to get the best results.  
+
+While looking at the confusion Matrix, if we consider only the Accuracy Values then our model is doomed to fail in Practicality.
+
+For example, we get an accuracy of 90%,which looks like very good number, but we are able to correclty predict only 30% of the Minority Class ( which is more important) and out of our Predictions only 30 % are correct then it is a challenge.
+
+Out of overall 1600, if we have 300 people who are quitting and our model gives accuracy of 90 percent it is not enough to say that our model is good as the majority class is itself near 90% of the toal observations. Our aim is to predict the Minority. So, if our model is able to identify only 100 people ( low specificity ) and to identify that 100 people we are predicting in all 300 people ( High Rate )- which means 200 are a wrong prediction.
+
+In Practical Sense, if HR wants to talk to all the identified people they have to address atleast 300 employees to actually address the concerns of only 100 people which is also just 30% of overall Attrition. 
+
+# Results
+
+After checking all Models, we find that XGBTree ( Boosted Decision Tree) works the best for us with a decent specificity rate ( > 50%) and a very low error rate ( < 30 %). 
+
+The overall accuracy is 89% which is also very good.
+
+```{r}
+confusionMatrix(Predictions_xgb,Testing$Attrition)
+```
+
+# Conclusion
+
+So, our best single model is XGBTree and further work can be done by looking at ensemble and stacking of the models which can help improve our metrics.
